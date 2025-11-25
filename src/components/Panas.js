@@ -17,7 +17,9 @@ function QuestionnaireRow({ propositionName, proposition,handleChange }) {
     const [last, setLast] = React.useState(null);
 
     const updateCheckBox = (event) => {
-        handleChange(propositionName, event.target.name)
+        // Extract numeric value from checkbox name (e.g., "checked2" -> 2)
+        const numericValue = parseInt(event.target.name.replace('checked', ''), 10);
+        handleChange(propositionName, numericValue)
         if(last !== null && last !== event.target.name) {
             setState({ ...state,
                 [event.target.name]: event.target.checked,
