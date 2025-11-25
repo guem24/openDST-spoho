@@ -10,6 +10,7 @@ import EndPage from "./pages/EndPage";
 import StepperWithLabels from "./components/StepperWithLabels";
 import CancelDialog from "./components/CancelDialog.js";
 import { UAParser } from 'ua-parser-js';
+import apiService from './services/api';
 
 /**
  * The main component holds most of the data that is collected during the study run. It's the parent component of the
@@ -292,27 +293,69 @@ class Main extends React.Component {
      * Is passed to the startPage component to save the metadata of the study run
      * @param language the chosen language
      */
-    updateStudyTracker(language) {
+    async updateStudyTracker(language) {
         let ua = new UAParser().getResult();
-        if(process.env.NODE_ENV !== "development" && process.env.REACT_APP_LOGGING === "true") {
-            jatos.onLoad(() => { //eslint-disable-line no-undef
+
+        // Initialize metadata
+        const studyTitle = "Digital Stress Test - Sporthochschule Köln";
+        const studyUuid = Date.now().toString(); // Use timestamp as unique identifier
+        const referenceTime = Date.now();
+
+        this.data.studyTimes.reference = referenceTime;
+
+        if(process.env.REACT_APP_LOGGING === "true") {
+            try {
+                // Initialize participant in Supabase
+                const participantId = await apiService.initializeParticipant({
+                    device: ua.device.type || 'unknown',
+                    operatingSystem: ua.os.name || 'unknown',
+                    browser: `${ua.browser.name || 'unknown'} ${ua.browser.version || ''}`,
+                    language: language,
+                    studyTitle: studyTitle,
+                    studyUuid: studyUuid,
+                    workerId: null,
+                    referenceTime: referenceTime
+                });
+
+                // Store metadata locally for the session
                 this.data.studyMetaTracker = {
-                    studyId: jatos.studyId, //eslint-disable-line no-undef
-                    studyTitle: jatos.studyProperties.title, //eslint-disable-line no-undef
-                    studyUuid: jatos.studyProperties.uuid, //eslint-disable-line no-undef
-                    componentId: jatos.componentId, //eslint-disable-line no-undef
-                    studyResultId: jatos.studyResultId, //eslint-disable-line no-undef
-                    workerId: jatos.workerId, //eslint-disable-line no-undef
-                    device: ua.device.type,
-                    operatingSystem: ua.os.name,
-                    surveyURL: this.createSurveyURL(jatos.studyId, jatos.studyResultId, process.env.REACT_APP_SURVEY_HOST_PATH), //eslint-disable-line no-undef
-                    browser: `${ua.browser.name} ${ua.browser.version}`,
+                    studyId: null,
+                    studyTitle: studyTitle,
+                    studyUuid: studyUuid,
+                    componentId: null,
+                    studyResultId: participantId, // Use Supabase participant ID
+                    workerId: null,
+                    device: ua.device.type || 'unknown',
+                    operatingSystem: ua.os.name || 'unknown',
+                    surveyURL: this.createSurveyURL(null, participantId, process.env.REACT_APP_SURVEY_HOST_PATH),
+                    browser: `${ua.browser.name || 'unknown'} ${ua.browser.version || ''}`,
                     language: language,
                     age: null,
                     gender: null,
                     videosSubmitted: null,
                 };
-            })
+
+                console.log('Participant initialized:', participantId);
+            } catch (error) {
+                console.error('Error initializing participant:', error);
+                // Still set local metadata even if API call fails
+                this.data.studyMetaTracker = {
+                    studyId: null,
+                    studyTitle: studyTitle,
+                    studyUuid: studyUuid,
+                    componentId: null,
+                    studyResultId: 'local-' + Date.now(),
+                    workerId: null,
+                    device: ua.device.type || 'unknown',
+                    operatingSystem: ua.os.name || 'unknown',
+                    surveyURL: '',
+                    browser: `${ua.browser.name || 'unknown'} ${ua.browser.version || ''}`,
+                    language: language,
+                    age: null,
+                    gender: null,
+                    videosSubmitted: null,
+                };
+            }
         }
     }
 
@@ -372,42 +415,52 @@ class Main extends React.Component {
     }
 
     /**
-     * Uploads data (mathtask, speechtask and metadata) to the JATOS backend.
+     * Uploads data (mathtask, speechtask and metadata) to the Supabase backend.
      * @param {string} timeVariable see function setStudyTimes
      * @param timeStamp see function setStudyTimes
      */
-    uploadData(timeVariable, timeStamp) {
+    async uploadData(timeVariable, timeStamp) {
         this.setStudyTimes(timeVariable, timeStamp);
-        let studyResultId = this.data.studyMetaTracker.studyResultId;
-        if(process.env.NODE_ENV !== "development" && process.env.REACT_APP_LOGGING === "true") {
-            jatos.uploadResultFile(JSON.stringify(this.data.speechTaskFeedback), studyResultId + '_speechTask.json')//eslint-disable-line no-undef
-            jatos.uploadResultFile(JSON.stringify(this.data.mathTaskPerformance), studyResultId + '_mathTask.json')//eslint-disable-line no-undef
-            jatos.uploadResultFile([this.data.studyTimes, this.data.studyMetaTracker, this.data.vasFeedback, this.data.panasFeedback, this.data.checkBoxForPriorParticipation], studyResultId + '_metaParticipantData.json')//eslint-disable-line no-undef
+
+        if(process.env.REACT_APP_LOGGING === "true") {
+            try {
+                // Update timing data
+                await apiService.updateParticipantTiming(this.data.studyTimes);
+                console.log('Data uploaded successfully');
+            } catch (error) {
+                console.error('Error uploading data:', error);
+            }
         }
     }
 
     /**
-     * Is called at the end of the study or when cancelling the study to upload all the study data (except videos) and
-     * the final data_storage.txt configuration file.
-     * @param dataConfig This object should have the following form:
-     * new Blob([`save_all_data\n${Date.now()}\n${this.props.studyMetaTracker.studyTitle}\n${this.props.studyMetaTracker.studyUuid}`], {type: 'text/plain'})
-     * The first line of the argument passed to the blob constructor can be save_all_data, save_no_data or save_without_video.
-     * This is a configuration needed for our data storage concept. Please contact us for further details regarding this.
+     * Is called at the end of the study or when cancelling the study to upload all the study data to Supabase.
+     * @param dataConfig This parameter is kept for compatibility but not used with Supabase
      * @param isVideoDataSubmitted true or false depending on whether videos are submitted or not.
      */
-    uploadFinalData(dataConfig, isVideoDataSubmitted) {
+    async uploadFinalData(dataConfig, isVideoDataSubmitted) {
         this.data.studyTimes.test_end = Date.now() - this.data.studyTimes.reference;
         this.data.studyMetaTracker.videosSubmitted = isVideoDataSubmitted;
-        let studyResultId = this.data.studyMetaTracker.studyResultId;
-        if(process.env.NODE_ENV !== "development" && process.env.REACT_APP_LOGGING === "true") {
-            jatos.uploadResultFile(JSON.stringify(this.data.speechTaskFeedback), studyResultId + '_speechTask.json')//eslint-disable-line no-undef
-            jatos.uploadResultFile(JSON.stringify(this.data.mathTaskPerformance), studyResultId + '_mathTask.json')//eslint-disable-line no-undef
-            jatos.uploadResultFile([this.data.studyTimes, this.data.studyMetaTracker, this.data.vasFeedback, this.data.panasFeedback, this.data.checkBoxForPriorParticipation], studyResultId + '_metaParticipantData.json')//eslint-disable-line no-undef
-            jatos.uploadResultFile(dataConfig, studyResultId + '_data_storage.txt')//eslint-disable-line no-undef
-            jatos.submitResultData(JSON.stringify(this.data.studyTimes));//eslint-disable-line no-undef
-            jatos.appendResultData(JSON.stringify(this.data.studyMetaTracker));//eslint-disable-line no-undef
-            jatos.appendResultData(JSON.stringify(this.data.vasFeedback));//eslint-disable-line no-undef
-            jatos.appendResultData(JSON.stringify(this.data.panasFeedback))//eslint-disable-line no-undef
+
+        if(process.env.REACT_APP_LOGGING === "true") {
+            try {
+                // Upload all study data to Supabase
+                await apiService.uploadFinalData({
+                    studyTimes: this.data.studyTimes,
+                    studyMetaTracker: this.data.studyMetaTracker,
+                    vasFeedback: this.data.vasFeedback,
+                    panasFeedback: this.data.panasFeedback,
+                    checkBoxForPriorParticipation: this.data.checkBoxForPriorParticipation,
+                    mathTaskPerformance: this.data.mathTaskPerformance,
+                    speechTaskFeedback: this.data.speechTaskFeedback,
+                    speechTestAnalysis: this.data.speechTestAnalysis,
+                    mathTaskScore: this.data.mathTaskScore
+                });
+
+                console.log('Final data uploaded successfully');
+            } catch (error) {
+                console.error('Error uploading final data:', error);
+            }
         }
     }
 
@@ -516,13 +569,58 @@ class Main extends React.Component {
         this.handleNext()
     }
 
-    handlerCheckBoxForPriorParticipation(bool) {
+    async handlerCheckBoxForPriorParticipation(bool) {
         this.data.checkBoxForPriorParticipation.participated = bool;
+
+        // Update in Supabase if logging is enabled
+        if(process.env.REACT_APP_LOGGING === "true") {
+            try {
+                const participantId = apiService.getParticipantId();
+                if (participantId) {
+                    await fetch(`${process.env.REACT_APP_SUPABASE_URL}/rest/v1/participants?id=eq.${participantId}`, {
+                        method: 'PATCH',
+                        headers: {
+                            'apikey': process.env.REACT_APP_SUPABASE_ANON_KEY,
+                            'Authorization': `Bearer ${process.env.REACT_APP_SUPABASE_ANON_KEY}`,
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            prior_participation: bool
+                        })
+                    });
+                }
+            } catch (error) {
+                console.error('Error updating prior participation:', error);
+            }
+        }
     }
 
-    genderAndAgeHandler = (age, gender) => {
+    genderAndAgeHandler = async (age, gender) => {
         this.data.studyMetaTracker.age = age
         this.data.studyMetaTracker.gender = gender
+
+        // Update in Supabase if logging is enabled
+        if(process.env.REACT_APP_LOGGING === "true") {
+            try {
+                const participantId = apiService.getParticipantId();
+                if (participantId) {
+                    await fetch(`${process.env.REACT_APP_SUPABASE_URL}/rest/v1/participants?id=eq.${participantId}`, {
+                        method: 'PATCH',
+                        headers: {
+                            'apikey': process.env.REACT_APP_SUPABASE_ANON_KEY,
+                            'Authorization': `Bearer ${process.env.REACT_APP_SUPABASE_ANON_KEY}`,
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            age: age,
+                            gender: gender
+                        })
+                    });
+                }
+            } catch (error) {
+                console.error('Error updating age and gender:', error);
+            }
+        }
     }
 
     speechTestAnalysisCallback(data) {
