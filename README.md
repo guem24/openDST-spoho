@@ -1,75 +1,150 @@
 # Digital Stress Test
 
-The Digital Stress Test is created with the JavaScript framework React.js in combination with [JATOS](https://www.jatos.org/) as a backend for study management. The app was setup, built and configured using the "create react app" toolchain. This includes the package manager npm, the bundler webpack and the compiler babel. For detailed introduction and alternatives see below or visit [reactjs.org](https://reactjs.org/).
+React-based stress assessment application with Supabase backend for study management.
 
-The Digital Stress Test was developed in conjunction with [this paper](https://dx.doi.org/10.2196/32280). Since publication of the paper the following changes haven been made to the app:
-* A cancel button was added
-* "faked" feedback during the speech task with a traffic light component
-* wordings for video storage possibility
-* logging updates
+## Overview
 
-A presentation variant based on this code in which no data is logged can be accessed [here](https://resilience.tf.uni-bielefeld.de/publix/39/start?batchId=39&generalMultiple).
+Digital Stress Test implements a standardized stress assessment protocol. Built with React 16, Material-UI, and Supabase for data persistence. This version has been modified from the original JATOS-based implementation.
 
-<i>Please note: Before using the Digital Stress Test in a study, please [contact us](https://www.uni-bielefeld.de/fakultaeten/technische-fakultaet/arbeitsgruppen/multimodal-behavior-processing/index.xml).</i>
+Reference: https://dx.doi.org/10.2196/32280
 
-## Source Code
+## Project Structure
 
-The web app is written as a single-page application using React.js. The Main.js component is where most of the state relevant for the study logic resides. Also the data is collected there. 
+```
+src/
+├── Main.js              # Central state management and study orchestration
+├── pages/               # Study pages (StartPage, MathTask, SpeechTask, etc.)
+├── components/          # Reusable UI components
+├── services/            # API services (Supabase integration)
+├── locales/             # Internationalization files (i18n)
+└── img/                 # Images and logos
+```
 
+## Key Components
 
-### Project Structure:
-* **/src/Main.js**: This is the central component where the study state (which components are to be rendered) and data (task times, means, loggings, default language, ...) is located.
-* **/src/pages/**: Contains the pages out of which the study is composed. They are basically children of the Main component.
-* **/src/components/**: Contains the reusable components which are used in the different pages components.
-* **/src/img/**: Contains logos and the images for the TrafficLight component.
-* **/src/locales/**: Contains the locale files for the different translations of the app. Internationalization is managed through the i18n-module.
-* **/.env**: Contains environment variables where logging, video-recording, mobile-only and URLs for the app can be configured. <i>Note: mobile-only is enabled as default and the non-mobile layout for the DST is not developed yet. If you want to view the DST on a desktop computer you have to use the mobile mode of your browser.</i>
+### Main.js
+Central component managing:
+- Study state and navigation
+- Data collection
+- Page sequencing via `studyPagesSequence` array
+- Slide navigation via `slideSequences` object
 
+### Study Flow
+Eight states define the study progression:
+1. startPage
+2. introduction
+3. mathTaskTutorial
+4. mathTask
+5. mathTaskResult
+6. speechTaskTutorial
+7. speechTask
+8. endPage
 
-### Render Logic:
+Navigation controlled by `pageIndex` and `slideIndex` state variables.
 
-The Main.js component conditionally renders its children based on 8 different study states: 'startPage', 'introduction', 'mathTaskTutorial', 'mathTask', 'mathTaskResult', 'speechTaskTutorial', 'speechTask', 'endPage'.
+## Configuration
 
-These study states correspond to components of the same name, which are called pages in the context of this app. The sequence in which those pages are ordered in the study flow is specified in an array named studyPagesSequence in Main.js
+### Environment Variables (.env)
+```bash
+REACT_APP_LOGGING=true                    # Enable data collection
+REACT_APP_MOBILE_ONLY=true                # Restrict to mobile devices
+REACT_APP_SUPABASE_URL=your-url           # Supabase project URL
+REACT_APP_SUPABASE_ANON_KEY=your-key      # Supabase anonymous key
+```
 
-Each page can consist of several slides which are specified in the slideSequences-object in Main.js.
+Note: Mobile-only mode is default. Desktop layout not yet implemented.
 
-During the study flow the variables pageIndex and slideIndex in Main.js are incremented to render the components of the app.
+## Development
 
-## JATOS
-*	JATOS can be used as a backend solution, to store files (temporarily) and manage online studies. 
-*	JATOS is installed on the study web-server
-*	studies can be hosted in the GUI where every new project needs a new "study-asset-root" directory in JATOS 
-*	in this directory, the built project must be placed
- 
-## Video recording and data upload/storage
-Per default video recording and data logging are disabled in the .env-file. We developed a dedicated data security concept for collecting data and storing it. Please [contact us](https://www.uni-bielefeld.de/fakultaeten/technische-fakultaet/arbeitsgruppen/multimodal-behavior-processing/index.xml) for further information.
- 
-<i>Please note: If video recording or data logging are enabled the data privacy statement has to be adapted.</i>
+### Prerequisites
+- Node.js 14+
+- npm or yarn
 
-# General Info on React
+### Installation
+```bash
+npm install
+```
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+### Run Development Server
+```bash
+npm start
+```
+Access at http://localhost:3000
 
-## Available Scripts
+### Run with HTTPS
+```bash
+npm run start:https
+```
+Access at https://localhost:3000
 
-In the project directory, you can run:
+### Build for Production
+```bash
+npm run build
+```
+Outputs to `/build` directory.
 
-### `npm start`
+## Database
 
-Runs the app in the development mode.<br />
-Open [http://localhost:3000](http://localhost:3000) to view it in the browser.
+### Supabase Setup
+1. Create Supabase project
+2. Run `supabase-schema.sql` to create tables
+3. Run `enable-rls-final.sql` to configure Row Level Security
+4. Add credentials to `.env`
 
-The page will reload if you make edits.<br />
-You will also see any lint errors in the console.
+### Tables
+- participants
+- vas_scores
+- panas_scores
+- math_task_performance
+- speech_task_feedback
+- speech_task_analysis
 
-### `npm run build`
+## Admin Dashboard
 
-Builds the app for production to the `build` folder.<br />
-It correctly bundles React in production mode and optimizes the build for the best performance.
+Access `admin-dashboard.html` directly in browser to:
+- View participant statistics
+- Export data as CSV
+- Visualize data insights with charts
 
-The build is minified and the filenames include the hashes.<br />
-Your app is ready to be deployed!
+## Data Privacy
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+Default configuration: logging disabled. Video recording capability exists but requires dedicated security implementation. Contact project maintainers before enabling data collection in production.
 
+## Deployment
+
+See `HTTPS_SETUP.md` for deployment options:
+- Netlify (recommended)
+- Vercel
+- AWS S3 + CloudFront
+- Self-hosted
+
+## Internationalization
+
+Managed via i18next. Supported languages:
+- German (de)
+- English (en)
+
+Language files located in `/src/locales/`
+
+## Browser Compatibility
+
+Tested on:
+- Chrome 90+
+- Firefox 88+
+- Safari 14+
+- Edge 90+
+
+Mobile browsers recommended for optimal experience.
+
+## License
+
+Contact maintainers for usage permissions: https://www.uni-bielefeld.de/fakultaeten/technische-fakultaet/arbeitsgruppen/multimodal-behavior-processing/
+
+## Technical Stack
+
+- React 16.14
+- Material-UI 4.11
+- Supabase (PostgreSQL)
+- Chart.js
+- i18next
+- React Router
