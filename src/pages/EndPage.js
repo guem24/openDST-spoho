@@ -16,6 +16,7 @@ export default class EndPage extends React.Component{
         this.state = {
             showCircularProgress: false,
             forceLastSlide: false,
+            showCompletionPage: false,
         }
     }
 
@@ -205,10 +206,12 @@ export default class EndPage extends React.Component{
                                 size="medium"
                                 className="alert-buttons"
                                 onClick={() => {
-                                    if (process.env.REACT_APP_LOGGING === 'true') {
-                                        jatos.endStudyAndRedirect(this.props.studyMetaTracker.surveyURL, true, "study completed successfully")//eslint-disable-line no-undef
+                                    if (process.env.REACT_APP_LOGGING === 'true' && this.props.studyMetaTracker.surveyURL) {
+                                        // Redirect to survey if URL is configured
+                                        window.location.href = this.props.studyMetaTracker.surveyURL;
                                     } else {
-                                        jatos.endStudy(true, "study completed successfully");//eslint-disable-line no-undef
+                                        // Show completion page
+                                        this.setState({ showCompletionPage: true });
                                     }
                                 }}>
                                 {i18next.t('end.questionnaire.soci_survey')}
@@ -222,6 +225,27 @@ export default class EndPage extends React.Component{
                             </div>
                         </div>
                     </div>
+                </div>
+            </Slide>
+            <Slide direction="right" in={this.state.showCompletionPage} mountOnEnter unmountOnExit>
+                <div>
+                    <Card className="my-4">
+                        <CardContent>
+                            <div className="row justify-content-center py-4">
+                                <div className="col-12">
+                                    <h2 className="font-weight-bold text-success mb-4">
+                                        ✓ {i18next.t('end.questionnaire.thanking')}
+                                    </h2>
+                                    <p className="lead">
+                                        The survey is complete. Thank you for your participation!
+                                    </p>
+                                    <p className="mt-4">
+                                        You may now close this window.
+                                    </p>
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
                 </div>
             </Slide>
         </>

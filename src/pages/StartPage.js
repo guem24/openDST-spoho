@@ -103,15 +103,11 @@ export default class StartPage extends React.Component {
                                             variant="contained"
                                             size="medium"
                                             className="alert-buttons"
-                                            onClick={() => {
-                                                this.props.updateStudyTracker(this.state.language);
+                                            onClick={async () => {
+                                                await this.props.updateStudyTracker(this.state.language);
                                                 if(process.env.NODE_ENV !== "development" && process.env.REACT_APP_LOGGING === "true") {
-                                                    let config = new Blob([`save_no_data\n${Date.now()}\n${jatos.studyProperties.title}\n${jatos.studyProperties.uuid}`], {type: 'text/plain'}); //eslint-disable-line no-undef
-                                                    jatos.onLoad(function() {//eslint-disable-line no-undef
-                                                        jatos.uploadResultFile(config, jatos.studyResultId + '_data_storage.txt')//eslint-disable-line no-undef
-                                                    });
-                                                    this.props.setStudyTimes('reference', Date.now());
-                                                    this.props.uploadData('test_start', null);
+                                                    this.props.setStudyTimes('test_start', Date.now());
+                                                    await this.props.uploadData('test_start', null);
                                                 }
                                                 window.scrollTo(0, 0);
                                                 this.props.handleNext();
